@@ -1,0 +1,52 @@
+# The runner is Debian 13, root, no docker. apt state does not survive between
+# builds; $HOME does, so the toolchain tarball is fetched and verified once.
+# swift-keys.asc is https://www.swift.org/keys/all-keys.asc, committed because the
+# runner cannot fetch it intact.
+# Each step runs in its own `sh -c`, so the install block is repeated per job.
+jobs:
+  build:
+    steps:
+      - |
+        set -eu
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get -qq update >/dev/null
+        apt-get -qq install -y binutils-gold curl gpg libicu-dev libcurl4-openssl-dev libedit-dev libsqlite3-dev libncurses-dev libpython3-dev libxml2-dev pkg-config uuid-dev tzdata git gcc libstdc++-14-dev >/dev/null
+        SWIFT="$HOME/swift-6.4.0-RELEASE-debian13"
+        if [ ! -x "$SWIFT/usr/bin/swift" ]; then
+          base="https://download.swift.org/swift-6.4.0-release/debian13/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13.tar.gz"
+          work="$(mktemp -d)"
+          curl -fsSL "$base" -o "$work/swift.tar.gz" "$base.sig" -o "$work/swift.tar.gz.sig"
+          export GNUPGHOME="$work/gnupg"; mkdir -m 700 "$GNUPGHOME"
+          gpg --batch --quiet --import .gitbay/swift-keys.asc
+          gpg --batch --verify "$work/swift.tar.gz.sig" "$work/swift.tar.gz"
+          tar -xzf "$work/swift.tar.gz" -C "$work"
+          mv "$work/swift-6.4.0-RELEASE-debian13" "$SWIFT" || true
+          rm -rf "$work"
+        fi
+        export PATH="$SWIFT/usr/bin:$PATH"
+        swift --version
+        swift format lint --strict --recursive Sources Tests Package.swift
+        swift build
+  test:
+    steps:
+      - |
+        set -eu
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get -qq update >/dev/null
+        apt-get -qq install -y binutils-gold curl gpg libicu-dev libcurl4-openssl-dev libedit-dev libsqlite3-dev libncurses-dev libpython3-dev libxml2-dev pkg-config uuid-dev tzdata git gcc libstdc++-14-dev >/dev/null
+        SWIFT="$HOME/swift-6.4.0-RELEASE-debian13"
+        if [ ! -x "$SWIFT/usr/bin/swift" ]; then
+          base="https://download.swift.org/swift-6.4.0-release/debian13/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13.tar.gz"
+          work="$(mktemp -d)"
+          curl -fsSL "$base" -o "$work/swift.tar.gz" "$base.sig" -o "$work/swift.tar.gz.sig"
+          export GNUPGHOME="$work/gnupg"; mkdir -m 700 "$GNUPGHOME"
+          gpg --batch --quiet --import .gitbay/swift-keys.asc
+          gpg --batch --verify "$work/swift.tar.gz.sig" "$work/swift.tar.gz"
+          tar -xzf "$work/swift.tar.gz" -C "$work"
+          mv "$work/swift-6.4.0-RELEASE-debian13" "$SWIFT" || true
+          rm -rf "$work"
+        fi
+        export PATH="$SWIFT/usr/bin:$PATH"
+        swift test
+    paths-ignore:
+      - docs/**
