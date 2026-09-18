@@ -183,6 +183,10 @@ Passphrase input: if `KEYCASK_PASSPHRASE` is set, its value is used. It
 exists so tests and scripts run unattended. Otherwise the CLI prompts on
 the terminal with echo off. No TTY and no variable is exit 2.
 
+Password input for `add` and `edit --password`: on a terminal, a hidden
+prompt. Without a terminal, the first line of stdin. Neither available is
+exit 2.
+
 Exit codes:
 
 | Code | Meaning |
@@ -220,10 +224,12 @@ and a Windows body where they differ.
   Linux; `clip.exe` to write and `powershell -command Get-Clipboard` to
   read on Windows. No tool found is exit 1 with a message naming the
   tools. `clip` spawns `keycask clipboard-daemon` detached with stdout
-  and stderr to null, writes `{"secret": ..., "previous": ...}` to its
-  stdin, and exits without waiting. The daemon sets the clipboard,
-  sleeps 45 seconds, reads the clipboard, and if it still equals the
-  secret restores `previous` or clears when `previous` is empty.
+  and stderr to null and exits without waiting. `clip` writes the
+  clipboard itself, then spawns the daemon with `{"secret": ...}` on its
+  stdin. The daemon sleeps 45 seconds, reads the clipboard, and clears
+  it if it still equals the secret. It never restores earlier contents,
+  so a second `clip` inside the window cannot bring an earlier secret
+  back.
 
 ## Errors
 
@@ -267,7 +273,7 @@ CLI, black box:
   masking versus `--reveal`, `--field` raw output, the ambiguous-name
   listing, `rm` without `--yes` and without a TTY, `edit` with no flags,
   `--generate` with `--words`, and `init` on an existing vault.
-- The clipboard daemon's restore decision is unit-tested in process;
+- The clipboard daemon's clear decision is unit-tested in process;
   the tests do not touch the real clipboard.
 
 The CLI suite is the conformance suite. When the app exists, its
